@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Keramik titlebar button decos, one per 17x17 cell, in the order of the
+     ButtonDeco enum: menu, on all desktops, not on all desktops, help,
+     minimize, maximize, restore, close, keep above on/off, keep below on/off,
+     shade on/off. Vector redraw of the KDE 3 Keramik bitmaps. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="238" height="17" viewBox="0 0 238 17" fill="#000">
+	<!-- Menu -->
+	<polygon points="3,6 12,6 7.5,11"/>
+	<!-- On all desktops -->
+	<g transform="translate(17,0)">
+		<rect x="7" y="4" width="2" height="8"/>
+		<rect x="4" y="7" width="8" height="2"/>
+	</g>
+	<!-- Not on all desktops -->
+	<g transform="translate(34,0)">
+		<rect x="4" y="7" width="8" height="2"/>
+	</g>
+	<!-- Help -->
+	<g transform="translate(51,0)">
+		<path d="M5,6 C5,3.3 11,3.3 11,5.7 C11,7.3 8,7.4 8,9.2" fill="none" stroke="#000" stroke-width="2"/>
+		<rect x="7" y="10" width="2" height="2"/>
+	</g>
+	<!-- Minimize -->
+	<g transform="translate(68,0)">
+		<rect x="4" y="10" width="8" height="2"/>
+	</g>
+	<!-- Maximize -->
+	<g transform="translate(85,0)">
+		<polygon points="8,3.5 12.5,8 12.5,9 3.5,9 3.5,8"/>
+		<rect x="4" y="10" width="8" height="2"/>
+	</g>
+	<!-- Restore -->
+	<g transform="translate(102,0)">
+		<rect x="4" y="4" width="8" height="2"/>
+		<polygon points="3.5,7 12.5,7 12.5,8 8,12.5 3.5,8"/>
+	</g>
+	<!-- Close -->
+	<g transform="translate(119,0)">
+		<polygon points="4,4 6,4 12,10 12,12 10,12 4,6"/>
+		<polygon points="12,4 10,4 4,10 4,12 6,12 12,6"/>
+	</g>
+	<!-- Keep above on -->
+	<g transform="translate(136,0)">
+		<rect x="4" y="2" width="8" height="2"/>
+		<polygon points="7,4 9,4 9,5 11,5 8,8 5,5 7,5"/>
+	</g>
+	<!-- Keep above off -->
+	<g transform="translate(153,0)">
+		<polygon points="8,2 11,5 9,5 9,6 7,6 7,5 5,5"/>
+		<rect x="4" y="6" width="8" height="2"/>
+	</g>
+	<!-- Keep below on -->
+	<g transform="translate(170,0)">
+		<polygon points="8,6 11,9 9,9 9,10 7,10 7,9 5,9"/>
+		<rect x="4" y="10" width="8" height="2"/>
+	</g>
+	<!-- Keep below off -->
+	<g transform="translate(187,0)">
+		<rect x="4" y="6" width="8" height="2"/>
+		<polygon points="7,8 9,8 9,9 11,9 8,12 5,9 7,9"/>
+	</g>
+	<!-- Shade on -->
+	<g transform="translate(204,0)">
+		<rect x="4" y="2" width="8" height="2"/>
+		<rect x="4" y="4" width="1" height="8"/>
+		<rect x="11" y="4" width="1" height="8"/>
+		<rect x="4" y="11" width="8" height="1"/>
+	</g>
+	<!-- Shade off -->
+	<g transform="translate(221,0)">
+		<rect x="4" y="2" width="8" height="2"/>
+	</g>
+</svg>

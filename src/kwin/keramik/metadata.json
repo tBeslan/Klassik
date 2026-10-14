@@ -1,0 +1,9 @@
+{
+	"KPlugin": {
+		"Id": "com.github.neeeeow.klassik.kwin.keramik",
+		"Name": "Keramik",
+		"ServiceTypes": ["org.kde.kdecoration3"]
+	},
+	"X-KDE-PluginInfo-Category": "Window Decorations",
+	"X-KWin-PluginAPI": "kdecoration"
+}

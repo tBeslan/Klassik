@@ -113,8 +113,8 @@ contrast=7
 
 [WM]
 activeBackground=151,173,195
-activeBlend=255,255,255
+activeBlend=151,173,195
 activeForeground=255,255,255
 inactiveBackground=210,210,210
-inactiveBlend=255,255,255
+inactiveBlend=215,215,215
 inactiveForeground=255,255,255

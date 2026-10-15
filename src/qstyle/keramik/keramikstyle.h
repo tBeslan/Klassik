@@ -12,6 +12,7 @@
 #include "../klassikstyle.h"
 
 #include <QBasicTimer>
+#include <QFont>
 #include <QHash>
 
 class QStyleOptionComboBox;
@@ -76,6 +77,30 @@ private:
 	QRect comboArrowRect(const QStyleOptionComboBox *cb) const;
 	// Area of the spinbox buttons, in left-to-right coordinates
 	QRect spinButtonField(const QStyleOptionSpinBox *sb) const;
+
+	// Keramik was drawn for the smaller fonts of KDE 3. Controls of a fixed
+	// size are enlarged by this factor, derived from the application font.
+	qreal sizeScale() const;
+	// Height added to controls holding text when they are enlarged, as a
+	// fraction of the height of a line of the application font
+	int extraHeight(qreal fraction) const;
+	// Whether a control gets enlarged here, i.e. it is not part of a
+	// control already being drawn or measured enlarged
+	bool enlarging() const;
+
+	// Draws with the painter scaled by sizeScale(), giving the drawing code
+	// a reduced copy of the option
+	template<typename Option, typename Draw>
+	void drawEnlarged(const Option *opt, QPainter *p, Draw draw) const;
+	// Calls fn with a reduced copy of the option of an enlarged complex
+	// control. Returns false for complex controls Keramik doesn't enlarge.
+	template<typename Fn>
+	bool withReducedOption(ComplexControl control, const QStyleOptionComplex *opt, Fn fn) const;
+
+	mutable int m_reducedDepth = 0;
+	mutable QFont m_scaleFont;
+	mutable qreal m_sizeScale = 0;
+	mutable int m_fontHeight = 0;
 
 	// Position of the moving block of each busy progress bar
 	QHash<const QObject *, int> m_busySteps;

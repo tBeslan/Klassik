@@ -20,6 +20,10 @@ class QPainter;
 
 namespace Keramik
 {
+	// Number of device pixels per logical pixel the painter draws at: the
+	// device pixel ratio, times the scale of controls Keramik enlarges
+	qreal paintScale(const QPainter *p);
+
 	class PixmapLoader
 	{
 	public:

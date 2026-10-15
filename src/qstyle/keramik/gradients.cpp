@@ -8,6 +8,7 @@
 */
 
 #include "gradients.h"
+#include "pixmaploader.h"
 
 #include <QImage>
 #include <QPainter>
@@ -108,8 +109,7 @@ GradientPainter::renderGradient(QPainter *p, const QRect &r, const QColor &c,
 	if (width <= 0 || height <= 0)
 		return;
 
-	const qreal dpr = p->device() ? p->device()->devicePixelRatio() : 1.0;
-	const int scale = qBound(1, int(std::ceil(dpr - 0.001)), 4);
+	const int scale = qBound(1, int(std::ceil(paintScale(p) - 0.001)), 6);
 
 	const QString key = QStringLiteral("keramik-gradient-%1-%2-%3-%4-%5")
 		.arg(width).arg(height).arg(c.rgb(), 0, 16).arg(menu).arg(scale);

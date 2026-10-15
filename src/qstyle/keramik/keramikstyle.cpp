@@ -18,6 +18,7 @@
 #include "pixmaploader.h"
 
 #include <QAbstractSpinBox>
+#include <QApplication>
 #include <QComboBox>
 #include <QLineEdit>
 #include <QPainter>
@@ -27,6 +28,8 @@
 #include <QToolBar>
 
 #include <qdrawutil.h>
+
+#include <cmath>
 
 #define loader Keramik::PixmapLoader::the()
 
@@ -169,6 +172,28 @@ namespace
 	const int busyInterval = 30;
 	const int busyStep = 2;
 
+	// Rectangle at the origin that a control of rect r gets drawn in, when
+	// the painter is scaled by k
+	QRect reducedRect(const QRect &r, qreal k)
+	{
+		return QRect(0, 0, int(std::ceil(r.width() / k - 0.01)), int(std::ceil(r.height() / k - 0.01)));
+	}
+
+	// Maps a rectangle in the reduced coordinates of a control of rect r back
+	QRect enlargedRect(const QRect &reduced, const QRect &r, qreal k)
+	{
+		const int left = r.x() + qRound(reduced.x() * k);
+		const int top = r.y() + qRound(reduced.y() * k);
+		const int right = r.x() + qRound((reduced.x() + reduced.width()) * k);
+		const int bottom = r.y() + qRound((reduced.y() + reduced.height()) * k);
+		return QRect(left, top, right - left, bottom - top);
+	}
+
+	bool isOnToolBar(const QWidget *widget)
+	{
+		return widget && qobject_cast<const QToolBar *>(widget->parentWidget());
+	}
+
 	bool isOnHorizontalToolBar(const QWidget *widget)
 	{
 		const QToolBar *toolbar = widget ? qobject_cast<const QToolBar *>(widget->parentWidget()) : nullptr;
@@ -179,6 +204,84 @@ namespace
 KeramikStyle::KeramikStyle()
 	: KlassikStyle(KlassikStyle::HighColor)
 {
+}
+
+qreal
+KeramikStyle::sizeScale() const
+{
+	const QFont font = QApplication::font();
+	if (m_sizeScale == 0 || font != m_scaleFont) {
+		m_scaleFont = font;
+		m_fontHeight = QFontMetrics(font).height();
+		// The lines of the fonts KDE 3 used were about 14 pixels high.
+		// Quarter steps keep the tiles from getting too blurry.
+		const qreal ratio = m_fontHeight / 14.0;
+		m_sizeScale = qMax(qreal(1), qRound(ratio * 4) / qreal(4));
+	}
+	return m_sizeScale;
+}
+
+int
+KeramikStyle::extraHeight(qreal fraction) const
+{
+	sizeScale(); // Updates m_fontHeight
+	return qRound(m_fontHeight * fraction);
+}
+
+bool
+KeramikStyle::enlarging() const
+{
+	return m_reducedDepth == 0 && sizeScale() != 1;
+}
+
+template<typename Option, typename Draw>
+void
+KeramikStyle::drawEnlarged(const Option *opt, QPainter *p, Draw draw) const
+{
+	const qreal k = sizeScale();
+	Option reduced(*opt);
+	reduced.rect = reducedRect(opt->rect, k);
+
+	p->save();
+	p->translate(opt->rect.topLeft());
+	p->scale(k, k);
+	++m_reducedDepth;
+	draw(&reduced);
+	--m_reducedDepth;
+	p->restore();
+}
+
+template<typename Fn>
+bool
+KeramikStyle::withReducedOption(ComplexControl control, const QStyleOptionComplex *opt, Fn fn) const
+{
+	auto call = [&](const auto *typed) {
+		auto reduced = *typed;
+		reduced.rect = reducedRect(opt->rect, sizeScale());
+		++m_reducedDepth;
+		fn(&reduced);
+		--m_reducedDepth;
+		return true;
+	};
+
+	switch (control) {
+	case CC_ScrollBar:
+	case CC_Slider:
+		if (const QStyleOptionSlider *slider = qstyleoption_cast<const QStyleOptionSlider *>(opt))
+			return call(slider);
+		break;
+	case CC_SpinBox:
+		if (const QStyleOptionSpinBox *spin = qstyleoption_cast<const QStyleOptionSpinBox *>(opt))
+			return call(spin);
+		break;
+	case CC_ComboBox:
+		if (const QStyleOptionComboBox *combo = qstyleoption_cast<const QStyleOptionComboBox *>(opt))
+			return call(combo);
+		break;
+	default:
+		break;
+	}
+	return false;
 }
 
 void
@@ -287,6 +390,14 @@ void
 KeramikStyle::drawPrimitive(PrimitiveElement pe, const QStyleOption *opt,
 							QPainter *p, const QWidget *widget) const
 {
+	if (enlarging() && (pe == PE_IndicatorCheckBox || pe == PE_IndicatorItemViewItemCheck ||
+						pe == PE_IndicatorRadioButton)) {
+		drawEnlarged(opt, p, [&](const QStyleOption *reduced) {
+			drawPrimitive(pe, reduced, p, widget);
+		});
+		return;
+	}
+
 	const QPalette &pal = opt->palette;
 	const QRect &r = opt->rect;
 	int x, y, w, h;
@@ -330,8 +441,9 @@ KeramikStyle::drawPrimitive(PrimitiveElement pe, const QStyleOption *opt,
 
 	case PE_IndicatorButtonDropDown:
 	case PE_PanelButtonTool: {
-		// Tool buttons outside of toolbars behave like push buttons
-		if (!(opt->state & State_AutoRaise)) {
+		// Tool buttons outside of toolbars behave like push buttons. Like in
+		// KDE 3, that includes flat ones when raised, e.g. in Qt Quick.
+		if (!(opt->state & State_AutoRaise) || !isOnToolBar(widget)) {
 			proxy()->drawPrimitive(PE_PanelButtonCommand, opt, p, widget);
 			break;
 		}
@@ -592,6 +704,24 @@ void
 KeramikStyle::drawControl(ControlElement control, const QStyleOption *opt,
 						  QPainter *p, const QWidget *widget) const
 {
+	// The labels are drawn separately, at their normal size
+	if (enlarging()) {
+		const QStyleOptionButton *btn = qstyleoption_cast<const QStyleOptionButton *>(opt);
+		if (control == CE_PushButtonBevel && btn) {
+			drawEnlarged(btn, p, [&](const QStyleOptionButton *reduced) {
+				drawControl(control, reduced, p, widget);
+			});
+			return;
+		}
+		const QStyleOptionTab *tab = qstyleoption_cast<const QStyleOptionTab *>(opt);
+		if (control == CE_TabBarTabShape && tab) {
+			drawEnlarged(tab, p, [&](const QStyleOptionTab *reduced) {
+				drawControl(control, reduced, p, widget);
+			});
+			return;
+		}
+	}
+
 	const QPalette &pal = opt->palette;
 	const QRect &r = opt->rect;
 	int x, y, w, h;
@@ -1041,6 +1171,16 @@ KeramikStyle::subElementRect(SubElement element, const QStyleOption *opt,
 
 	case SE_PushButtonFocusRect: {
 		const QStyleOptionButton *btn = qstyleoption_cast<const QStyleOptionButton *>(opt);
+		// Keep the focus rect inside the enlarged bevel
+		if (btn && enlarging()) {
+			const qreal k = sizeScale();
+			QStyleOptionButton reduced(*btn);
+			reduced.rect = reducedRect(btn->rect, k);
+			++m_reducedDepth;
+			const QRect r = subElementRect(element, &reduced, widget);
+			--m_reducedDepth;
+			return enlargedRect(r, btn->rect, k);
+		}
 		const QRect &wrect = opt->rect;
 		QRect r;
 		if (btn && (btn->features & (QStyleOptionButton::DefaultButton | QStyleOptionButton::AutoDefaultButton)))
@@ -1141,6 +1281,19 @@ void
 KeramikStyle::drawComplexControl(ComplexControl control, const QStyleOptionComplex *opt,
 								 QPainter *p, const QWidget *widget) const
 {
+	if (enlarging()) {
+		const qreal k = sizeScale();
+		p->save();
+		p->translate(opt->rect.topLeft());
+		p->scale(k, k);
+		const bool done = withReducedOption(control, opt, [&](const QStyleOptionComplex *reduced) {
+			drawComplexControl(control, reduced, p, widget);
+		});
+		p->restore();
+		if (done)
+			return;
+	}
+
 	const QPalette &pal = opt->palette;
 	const bool disabled = !(opt->state & State_Enabled);
 
@@ -1397,6 +1550,14 @@ QRect
 KeramikStyle::subControlRect(ComplexControl control, const QStyleOptionComplex *opt,
 							 SubControl sc, const QWidget *widget) const
 {
+	if (enlarging()) {
+		QRect reduced;
+		if (withReducedOption(control, opt, [&](const QStyleOptionComplex *ropt) {
+				reduced = subControlRect(control, ropt, sc, widget);
+			}))
+			return enlargedRect(reduced, opt->rect, sizeScale());
+	}
+
 	switch (control) {
 	case CC_ComboBox: {
 		const QStyleOptionComboBox *cb = qstyleoption_cast<const QStyleOptionComboBox *>(opt);
@@ -1593,6 +1754,17 @@ QStyle::SubControl
 KeramikStyle::hitTestComplexControl(ComplexControl control, const QStyleOptionComplex *opt,
 									const QPoint &pt, const QWidget *widget) const
 {
+	if (enlarging()) {
+		const qreal k = sizeScale();
+		const QPoint reducedPt(int(std::floor((pt.x() - opt->rect.x()) / k)),
+							   int(std::floor((pt.y() - opt->rect.y()) / k)));
+		SubControl result = SC_None;
+		if (withReducedOption(control, opt, [&](const QStyleOptionComplex *reduced) {
+				result = hitTestComplexControl(control, reduced, reducedPt, widget);
+			}))
+			return result;
+	}
+
 	SubControl result = KlassikStyle::hitTestComplexControl(control, opt, pt, widget);
 
 	// The upper half of the double arrow button scrolls back
@@ -1613,6 +1785,31 @@ int
 KeramikStyle::pixelMetric(PixelMetric metric, const QStyleOption *opt,
 						  const QWidget *widget) const
 {
+	if (enlarging()) {
+		switch (metric) {
+		case PM_SliderLength:
+		case PM_SliderControlThickness:
+		case PM_SliderThickness:
+		case PM_ExclusiveIndicatorWidth:
+		case PM_ExclusiveIndicatorHeight:
+		case PM_IndicatorWidth:
+		case PM_IndicatorHeight:
+		case PM_ScrollBarExtent:
+		case PM_ScrollBarSliderMin:
+		case PM_TabBarTabHSpace:
+		case PM_TabBarTabVSpace: {
+			++m_reducedDepth;
+			const int reduced = pixelMetric(metric, opt, widget);
+			--m_reducedDepth;
+			if (metric == PM_TabBarTabVSpace)
+				return qRound(reduced * sizeScale()) + extraHeight(0.3);
+			return qRound(reduced * sizeScale());
+		}
+		default:
+			break;
+		}
+	}
+
 	switch (metric) {
 	// BUTTONS
 	// -------------------------------------------------------------------
@@ -1698,6 +1895,34 @@ QSize
 KeramikStyle::sizeFromContents(ContentsType contents, const QStyleOption *opt,
 							   const QSize &contentSize, const QWidget *widget) const
 {
+	// The contents keep their size, the room around them is enlarged.
+	// Modern fonts also need more room above and below the text.
+	if (enlarging() && (contents == CT_PushButton || contents == CT_ComboBox ||
+						contents == CT_SpinBox || contents == CT_LineEdit)) {
+		++m_reducedDepth;
+		const QSize reduced = sizeFromContents(contents, opt, contentSize, widget);
+		--m_reducedDepth;
+		const qreal k = sizeScale();
+		// Line edits have only a thin frame, give them a height close to
+		// combos. Spinboxes get it from the size of their line edit.
+		qreal extra = 0.3;
+		if (contents == CT_LineEdit)
+			extra = 0.45;
+		else if (contents == CT_SpinBox)
+			extra = 0;
+		return QSize(contentSize.width() + qRound((reduced.width() - contentSize.width()) * k),
+					 contentSize.height() + qRound((reduced.height() - contentSize.height()) * k) +
+					 extraHeight(extra));
+	}
+
+	// Tool buttons outside of toolbars are drawn like buttons, at their normal size
+	if (enlarging() && contents == CT_ToolButton && !isOnToolBar(widget)) {
+		++m_reducedDepth;
+		const QSize size = sizeFromContents(contents, opt, contentSize, widget);
+		--m_reducedDepth;
+		return size + QSize(0, extraHeight(0.3));
+	}
+
 	switch (contents) {
 	// PUSHBUTTON SIZE
 	// ------------------------------------------------------------------
@@ -1713,7 +1938,7 @@ KeramikStyle::sizeFromContents(ContentsType contents, const QStyleOption *opt,
 	}
 
 	case CT_ToolButton: {
-		if (!(opt->state & State_AutoRaise)) {
+		if (!isOnToolBar(widget)) {
 			// Behaves like a button, so scale appropriately to the border
 			return QSize(contentSize.width() + 12, contentSize.height() + 10);
 		}

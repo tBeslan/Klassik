@@ -20,13 +20,19 @@
 
 using namespace Keramik;
 
-// Integer scale factor the tiles are rendered at for the painter's device.
+qreal
+Keramik::paintScale(const QPainter *p)
+{
+	const qreal dpr = p->device() ? p->device()->devicePixelRatio() : 1.0;
+	return dpr * qAbs(p->worldTransform().m11());
+}
+
+// Integer scale factor the tiles are rendered at for the painter.
 // Fractional ratios are rounded up, and the result gets downscaled by Qt.
 static int
 deviceScale(const QPainter *p)
 {
-	const qreal dpr = p->device() ? p->device()->devicePixelRatio() : 1.0;
-	return qBound(1, int(std::ceil(dpr - 0.001)), 4);
+	return qBound(1, int(std::ceil(paintScale(p) - 0.001)), 6);
 }
 
 PixmapLoader::PixmapLoader()
@@ -212,7 +218,7 @@ TilePainter::draw(QPainter *p, int x, int y, int width, int height,
 		scaleHeight = 0;
 
 	p->save();
-	if (!qFuzzyCompare(p->device() ? p->device()->devicePixelRatio() : 1.0, qreal(dscale)))
+	if (!qFuzzyCompare(paintScale(p), qreal(dscale)))
 		p->setRenderHint(QPainter::SmoothPixmapTransform);
 
 	int ypos = y;

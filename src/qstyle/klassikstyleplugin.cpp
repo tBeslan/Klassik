@@ -6,6 +6,7 @@
 
 #include "klassikstyleplugin.h"
 #include "klassikstyle.h"
+#include "keramik/keramikstyle.h"
 
 QStyle *KlassikStylePlugin::create(const QString &key)
 {
@@ -15,6 +16,8 @@ QStyle *KlassikStylePlugin::create(const QString &key)
 		return new KlassikStyle(KlassikStyle::HighColor);
 	else if (key.compare(QStringLiteral("B3/Klassik"), Qt::CaseInsensitive) == 0)
 		return new KlassikStyle(KlassikStyle::B3);
+	else if (key.compare(QStringLiteral("Keramik"), Qt::CaseInsensitive) == 0)
+		return new KeramikStyle();
 
 	return nullptr;
 }

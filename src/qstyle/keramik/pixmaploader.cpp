@@ -194,8 +194,57 @@ void
 TilePainter::draw(QPainter *p, int x, int y, int width, int height,
 				  const QColor &color, bool disabled)
 {
-	PixmapLoader &loader = PixmapLoader::the();
 	const int dscale = deviceScale(p);
+	if (qFuzzyCompare(paintScale(p), qreal(dscale))) {
+		drawTiles(p, x, y, width, height, color, disabled, dscale);
+		return;
+	}
+
+	// Fixed tiles are drawn whole even when they don't fit
+	PixmapLoader &loader = PixmapLoader::the();
+	int fullWidth = 0, fullHeight = 0;
+	for (unsigned int col = 0; col < columns(); ++col)
+		if (columnMode(col) == Fixed)
+			fullWidth += loader.size(absTileName(col, 0)).width();
+	for (unsigned int row = 0; row < rows(); ++row)
+		if (rowMode(row) == Fixed)
+			fullHeight += loader.size(absTileName(0, row)).height();
+	fullWidth = qMax(fullWidth, width);
+	fullHeight = qMax(fullHeight, height);
+	if (fullWidth <= 0 || fullHeight <= 0)
+		return;
+
+	// At a fractional scale, the borders between the tiles fall between
+	// device pixels and show up as seams. Assemble the tiles at integer
+	// scale instead, and scale the result as a whole.
+	QString key = QStringLiteral("keramik-tiles-%1-%2-%3-%4-%5")
+		.arg(width).arg(height).arg(color.rgb(), 0, 16).arg(disabled).arg(dscale);
+	for (unsigned int row = 0; row < rows(); ++row)
+		for (unsigned int col = 0; col < columns(); ++col)
+			key += QStringLiteral("-%1:%2%3").arg(absTileName(col, row)).arg(columnMode(col)).arg(rowMode(row));
+
+	QPixmap pix;
+	if (!QPixmapCache::find(key, &pix)) {
+		pix = QPixmap(fullWidth * dscale, fullHeight * dscale);
+		pix.setDevicePixelRatio(dscale);
+		pix.fill(Qt::transparent);
+		QPainter p2(&pix);
+		drawTiles(&p2, 0, 0, width, height, color, disabled, dscale);
+		p2.end();
+		QPixmapCache::insert(key, pix);
+	}
+
+	p->save();
+	p->setRenderHint(QPainter::SmoothPixmapTransform);
+	p->drawPixmap(QRect(x, y, fullWidth, fullHeight), pix);
+	p->restore();
+}
+
+void
+TilePainter::drawTiles(QPainter *p, int x, int y, int width, int height,
+					   const QColor &color, bool disabled, int dscale)
+{
+	PixmapLoader &loader = PixmapLoader::the();
 
 	unsigned int scaledColumns = 0, scaledRows = 0, lastScaledColumn = 0, lastScaledRow = 0;
 	int scaleWidth = width, scaleHeight = height;
@@ -216,10 +265,6 @@ TilePainter::draw(QPainter *p, int x, int y, int width, int height,
 		scaleWidth = 0;
 	if (scaleHeight < 0)
 		scaleHeight = 0;
-
-	p->save();
-	if (!qFuzzyCompare(paintScale(p), qreal(dscale)))
-		p->setRenderHint(QPainter::SmoothPixmapTransform);
 
 	int ypos = y;
 	if (scaleHeight && !scaledRows)
@@ -269,8 +314,6 @@ TilePainter::draw(QPainter *p, int x, int y, int width, int height,
 		}
 		ypos += realH;
 	}
-
-	p->restore();
 }
 
 RectTilePainter::RectTilePainter(int name, bool scaleH, bool scaleV,

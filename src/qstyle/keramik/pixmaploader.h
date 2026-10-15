@@ -84,6 +84,10 @@ namespace Keramik
 			return m_name + tileName(column, row);
 		}
 
+		// Draws the tiles at integer scale dscale
+		void drawTiles(QPainter *p, int x, int y, int width, int height,
+					   const QColor &color, bool disabled, int dscale);
+
 		int m_name;
 	};
 

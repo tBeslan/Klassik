@@ -804,15 +804,20 @@ KeramikStyle::drawControl(ControlElement control, const QStyleOption *opt,
 			const int pw = pixmap.width() / pixmap.devicePixelRatio();
 			const int ph = pixmap.height() / pixmap.devicePixelRatio();
 
+			// Keep the icon off the rounded end of the bevel, which got
+			// enlarged together with the bevel
+			const qreal k = enlarging() ? sizeScale() : 1;
+			const int inset = qRound(loader.size(keramik_pushbutton + KeramikTileCL).width() * k);
+
 			QRect iconRect;
 			if (button->text.isEmpty())
 				iconRect = QRect(x + w / 2 - pw / 2, y + h / 2 - ph / 2, pw, ph);
 			else
-				iconRect = QRect(x + 4, y + h / 2 - ph / 2, pw, ph);
+				iconRect = QRect(x + inset, y + h / 2 - ph / 2, pw, ph);
 			p->drawPixmap(visualRect(button->direction, r, iconRect), pixmap);
 
-			x += pw + 4;
-			w -= pw + 4;
+			x += inset + pw + 4;
+			w -= inset + pw + 4;
 		}
 
 		int tf = Qt::AlignCenter | Qt::TextShowMnemonic;
